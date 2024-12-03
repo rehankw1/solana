@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Configuration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white shadow-lg rounded-lg p-8 w-full max-w-md">
+        <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Trading Bot Configuration</h2>
+        <form id="configForm" class="w-full">
+            <table class="w-full border-collapse">
+                <tr class="border-b">
+                    <td class="p-2">Trade Mode</td>
+                    <td class="p-2">
+                        <select name="sell" id="sellSelect" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200">
+                            <option value="">Select</option>
+                            <option value="true">Sell</option>
+                            <option value="false">Buy</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr class="border-b">
+                    <td class="p-2">On/Off</td>
+                    <td class="p-2">
+                        <select name="trigger" id="triggerSelect" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200">
+                            <option value="">Select</option>
+                            <option value="true">On</option>
+                            <option value="false">Off</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr class="border-b">
+                    <td class="p-2">Diversification</td>
+                    <td class="p-2">
+                        <input type="checkbox" name="diverse" id="diverseCheckbox" class="form-checkbox text-blue-500">
+                    </td>
+                </tr>
+                <tr class="border-b">
+                    <td class="p-2">Min Wallets</td>
+                    <td class="p-2">
+                        <input type="number" name="minWallets" id="minWalletsInput" min="1" max="100" 
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200">
+                    </td>
+                </tr>
+                <tr class="border-b">
+                    <td class="p-2">Max Wallets</td>
+                    <td class="p-2">
+                        <input type="number" name="maxWallets" id="maxWalletsInput" min="1" max="100" 
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200">
+                    </td>
+                </tr>
+                <tr class="border-b">
+                    <td class="p-2">Market Cap Threshold</td>
+                    <td class="p-2">
+                        <input type="number" name="untillMCap" id="untillMCapInput" min="0" 
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200">
+                    </td>
+                </tr>
+                <tr class="border-b">
+                    <td class="p-2">Min Lot Size</td>
+                    <td class="p-2">
+                        <input type="number" name="minLot" id="minLotInput" min="1" 
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200">
+                    </td>
+                </tr>
+                <tr class="border-b">
+                    <td class="p-2">Max Lot Size</td>
+                    <td class="p-2">
+                        <input type="number" name="maxLot" id="maxLotInput" min="0" 
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200">
+                    </td>
+                </tr>
+                <tr class="border-b">
+                    <td class="p-2">Min Interval (s)</td>
+                    <td class="p-2">
+                        <input type="number" name="minInterval" id="minIntervalInput" min="1" 
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200">
+                    </td>
+                </tr>
+                <tr>
+                    <td class="p-2">Max Interval (s)</td>
+                    <td class="p-2">
+                        <input type="number" name="maxInterval" id="maxIntervalInput" min="1" 
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200">
+                    </td>
+                </tr>
+            </table>
+
+            <button type="submit" class="w-full mt-4 bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 transition-colors">
+                Update Configuration
+            </button>
+        </form>
+
+        <div id="response" class="mt-4 p-2 rounded-md text-center"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', prefillForm);
+
+        async function prefillForm() {
+            try {
+                const response = await axios.get('/config');
+                const config = response.data;
+
+                // Populate form fields
+                document.getElementById('sellSelect').value = config.sell !== undefined ? config.sell.toString() : '';
+                document.getElementById('triggerSelect').value = config.trigger !== undefined ? config.trigger.toString() : '';
+                document.getElementById('diverseCheckbox').checked = config.diverse || false;
+                document.getElementById('minWalletsInput').value = config.minWallets || '';
+                document.getElementById('maxWalletsInput').value = config.maxWallets || '';
+                document.getElementById('untillMCapInput').value = config.untillMCap || '';
+                document.getElementById('minLotInput').value = config.minLot || '';
+                document.getElementById('maxLotInput').value = config.maxLot || '';
+                document.getElementById('minIntervalInput').value = config.minInterval || '';
+                document.getElementById('maxIntervalInput').value = config.maxInterval || '';
+            } catch (error) {
+                console.error('Error fetching configuration:', error);
+                document.getElementById('response').innerHTML = `
+                    <div class="text-red-600">
+                        Error fetching configuration: ${error.response ? JSON.stringify(error.response.data) : error.message}
+                    </div>
+                `;
+            }
+        }
+
+        document.getElementById('configForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const formData = new FormData(form);
+            
+            const config = {};
+            for (let [key, value] of formData.entries()) {
+                switch(key) {
+                    case 'sell':
+                        // Send true for 'Sell', false for 'Buy'
+                        config[key] = value === 'true';
+                        break;
+                    case 'trigger':
+                        // Convert to boolean
+                        config[key] = value === 'true';
+                        break;
+                    case 'diverse':
+                        // Send false if unchecked
+                        config[key] = value === 'on';
+                        break;
+                    default:
+                        // Convert numeric inputs to numbers
+                        if (!isNaN(Number(value)) && value !== '') {
+                            config[key] = Number(value);
+                        }
+                }
+            }
+
+            const responseEl = document.getElementById('response');
+            try {
+                const response = await axios.post('/config', config);
+                responseEl.innerHTML = `<div class="text-green-600">Success: ${JSON.stringify(response.data, null, 2)}</div>`;
+            } catch (error) {
+                responseEl.innerHTML = `<div class="text-red-600">Error: ${error.response ? JSON.stringify(error.response.data, null, 2) : error.message}</div>`;
+            }
+        });
+    </script>
+</body>
+</html>
