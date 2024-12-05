@@ -92,9 +92,11 @@ export const sellFunction = async (
 ): Promise<void> => {
     try {
     const amountInLamorts = amountInSol * 1000000000;
-
     await swapNARAtoSOL(amountInLamorts.toString(), privateKey);
+    return;
+
     } catch (error) {
         console.error(`Distribution error:`, error);
+        return
     }
 }

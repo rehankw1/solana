@@ -5,6 +5,8 @@ import bs58 from 'bs58'
 import 'dotenv/config'
 
 const rpcUrl = process.env.RPC_URL as string;
+console.log(rpcUrl, "+++++++++")
+
 var connection = new Connection(rpcUrl, "finalized");
 
 export let owner: Keypair

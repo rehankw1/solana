@@ -19,25 +19,88 @@ mongoose.connect(process.env.MONGODB_URI as string);
 
 const masterWalletPrivKey = process.env.PRIVATE_KEY as string;
 
-//@ts-ignore
-var volume;
-export const swapNARAtoSOL = async (input: string, privKey: string, convertToLamports: boolean) => {
+export const swapNARAtoSOL = async (input: string, privKey: string) => {
     try {
         const raydium = await initSdk(privKey)
 
+        console.log("Swapping NARA to SOL", input);
+
         // SOL - NARA pool
         const poolId = 'BkTTZ5K2QJUtDyRhFfbTHMQ5B9XK5tm4dvEcJf9HZAK4'
-        const inputAmountinSOL = new BN(input)
-        const lamports = new BN(1000000000)
-        let inputAmount;
-        if(convertToLamports) {
-            inputAmount = inputAmountinSOL.mul(lamports)
+        // const inputAmount = new BN('2000000000000000')
+        const inputAmount = new BN(input)
+        const inputMint = "2u9ZQVaSTVxCBVoyw75QioxivBnhLkCsJzvFTR8oGjAH" //NARA
+      
+        let poolInfo: ApiV3PoolInfoStandardItemCpmm
+        let poolKeys: CpmmKeys | undefined
+        let rpcData: CpmmRpcData
+      
+        if (raydium.cluster === 'mainnet') {
+            const data = await raydium.api.fetchPoolById({ ids: poolId })
+            poolInfo = data[0] as ApiV3PoolInfoStandardItemCpmm
+            if (!isValidCpmm(poolInfo.programId)) throw new Error('target pool is not CPMM pool')
+            rpcData = await raydium.cpmm.getRpcPoolInfo(poolInfo.id, true)
         } else {
-            inputAmount = inputAmountinSOL
+            const data = await raydium.cpmm.getPoolInfoFromRpc(poolId)
+            poolInfo = data.poolInfo
+            poolKeys = data.poolKeys
+            rpcData = data.rpcData
         }
+      
+        if (inputMint !== poolInfo.mintA.address && inputMint !== poolInfo.mintB.address)
+            throw new Error('input mint does not match pool')
+      
+        const baseIn = inputMint === poolInfo.mintA.address
 
+        console.log(poolInfo.day.volume, "======================")
+
+      
+        // swap pool mintA for mintB
+        const swapResult = CurveCalculator.swap(
+            inputAmount,
+            baseIn ? rpcData.baseReserve : rpcData.quoteReserve,
+            baseIn ? rpcData.quoteReserve : rpcData.baseReserve,
+            rpcData.configInfo!.tradeFeeRate
+        )
+
+        console.log(swapResult.destinationAmountSwapped.toString(), "++++++++++++")
+      
+        const { execute } = await raydium.cpmm.swap({
+            poolInfo,
+            poolKeys,
+            inputAmount,
+            swapResult,
+            slippage: 0.001,
+            baseIn,
+            computeBudgetConfig: {
+                units: 710000,
+                microLamports: 5859150,
+            },
+        })
+      
+        // printSimulateInfo()
+        const { txId } = await execute({ sendAndConfirm: true })
+        console.log(`swapped: ${poolInfo.mintA.symbol} to ${poolInfo.mintB.symbol}:`, {
+            txId: `https://explorer.solana.com/tx/${txId}`,
+        })
+
+        return swapResult.destinationAmountSwapped.toString();
+
+    } catch (error) {
+        console.error(error)
+    }
+}
+
+export const swapSOLtoNARA = async (input: string, privKey: string) => {
+    try {
+        const raydium = await initSdk(privKey)
+        console.log("Swapping SOL to NARA", input);
+
+        // SOL - NARA pool
+        const poolId = 'BkTTZ5K2QJUtDyRhFfbTHMQ5B9XK5tm4dvEcJf9HZAK4'
+        const inputAmount = new BN(input)
         
-        const inputMint = "2u9ZQVaSTVxCBVoyw75QioxivBnhLkCsJzvFTR8oGjAH" 
+        const inputMint = NATIVE_MINT.toBase58()
       
         let poolInfo: ApiV3PoolInfoStandardItemCpmm
         let poolKeys: CpmmKeys | undefined
@@ -89,100 +152,7 @@ export const swapNARAtoSOL = async (input: string, privKey: string, convertToLam
             txId: `https://explorer.solana.com/tx/${txId}`,
         })
 
-        const returnData = {
-            amount: swapResult.destinationAmountSwapped.toString(),
-            volume: poolInfo.day,
-        }
-
-        return returnData
-
-        // return swapResult.destinationAmountSwapped.toString();
-
-    } catch (error) {
-        console.error(error)
-    }
-}
-
-async function swapSOLtoNARA(output: string, privKey: string, convertToLamports: boolean) {
-    try {
-        const raydium = await initSdk(privKey)
-
-        console.log("Swapping SOL to NARA", output);
-
-        // SOL - NARA pool
-        const poolId = 'BkTTZ5K2QJUtDyRhFfbTHMQ5B9XK5tm4dvEcJf9HZAK4'
-        const inputAmountinSOL = new BN(output)
-        const lamports = new BN(1000000000)
-        let outputAmount;
-        if(convertToLamports) {
-            outputAmount = inputAmountinSOL.mul(lamports)
-        } else {
-            outputAmount = inputAmountinSOL
-        }
-        const outputMint = '2u9ZQVaSTVxCBVoyw75QioxivBnhLkCsJzvFTR8oGjAH'
-      
-        let poolInfo: ApiV3PoolInfoStandardItemCpmm
-        let poolKeys: CpmmKeys | undefined
-        let rpcData: CpmmRpcData
-      
-        if (raydium.cluster === 'mainnet') {
-            const data = await raydium.api.fetchPoolById({ ids: poolId })
-            poolInfo = data[0] as ApiV3PoolInfoStandardItemCpmm
-            if (!isValidCpmm(poolInfo.programId)) throw new Error('target pool is not CPMM pool')
-            rpcData = await raydium.cpmm.getRpcPoolInfo(poolInfo.id, true)
-        } else {
-            const data = await raydium.cpmm.getPoolInfoFromRpc(poolId)
-            poolInfo = data.poolInfo
-            poolKeys = data.poolKeys
-            rpcData = data.rpcData
-        }
-      
-        if (outputMint !== poolInfo.mintA.address && outputMint !== poolInfo.mintB.address)
-            throw new Error('input mint does not match pool')
-      
-        const baseIn = outputMint === poolInfo.mintB.address
-      
-        // swap pool mintA for mintB
-        const swapResult = CurveCalculator.swapBaseOut({
-            poolMintA: poolInfo.mintA,
-            poolMintB: poolInfo.mintB,
-            tradeFeeRate: rpcData.configInfo!.tradeFeeRate,
-            baseReserve: rpcData.baseReserve,
-            quoteReserve: rpcData.quoteReserve,
-            outputMint,
-            outputAmount,
-        })
-      
-        const { execute, transaction } = await raydium.cpmm.swap({
-            poolInfo,
-            poolKeys,
-            inputAmount: new BN(0), // if set fixedOut to true, this arguments won't be used
-            fixedOut: true,
-            swapResult: {
-              sourceAmountSwapped: swapResult.amountIn,
-              destinationAmountSwapped: outputAmount,
-            },
-            slippage: 0.001,
-            baseIn,
-            txVersion,
-            // optional: set up priority fee here
-            computeBudgetConfig: {
-              units: 600000,
-              microLamports: 465915,
-            },
-          })
-      
-        const { txId } = await execute({ sendAndConfirm: true })
-        console.log(`swapped: ${poolInfo.mintA.symbol} to ${poolInfo.mintB.symbol}:`, {
-        txId: `https://explorer.solana.com/tx/${txId}`,
-        })
-
-        const returnData = {
-            amount: swapResult.amountRealOut.toString(),
-            volume: poolInfo.day,
-        }
-
-        return returnData
+        return swapResult.destinationAmountSwapped.toString();
 
     } catch (error) {
         console.error(error)
@@ -211,16 +181,17 @@ async function transferSOL(fromPrivKey: string, to: string, amount: number){
         transaction.feePayer = fromWallet.publicKey;
         transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
-        await transaction.sign(fromWallet.payer);
+        transaction.sign(fromWallet.payer);
 
         const txId = await connection.sendTransaction(transaction, [fromWallet.payer], { skipPreflight: false });
         console.log("Transaction Signature:", txId);        
 
         await connection.confirmTransaction(txId);
+        return true;
 
-        console.log("Transfer complete");
     } catch (error) {
         console.log(error);
+        return false;
     }
 }
 
@@ -278,13 +249,13 @@ async function transferNARA(NARAMintAddress: string, fromPrivKey: string, toAddr
           { skipPreflight: false }
         );
     
-        console.log("transactionSignature", txId);
-      
+        console.log("transactionSignature", txId);      
         await connection.confirmTransaction(txId);
+        return true;
     
-        console.log("transfer complete");
       } catch (error) {
         console.log(error);
+        return false;
       }    
 }
 
@@ -312,119 +283,128 @@ async function generateWallet() {
     return walletData;
   }
 
-async function generateRandomWallets(count: number): Promise<string[]> {
+async function generateRandomWallets(count: number): Promise<{ publicKey: string; secretKey: { base58: string } }[]> {
     const wallets = [];
     for (let i = 0; i < count; i++) {
         const wallet = await generateWallet();
         wallets.push(wallet);
     }
-    //@ts-ignore
     return wallets;
 }
 
-export const distributeTokens = async (
+export const getCurrentVolume = async () => {
+    try {
+        const poolId = 'BkTTZ5K2QJUtDyRhFfbTHMQ5B9XK5tm4dvEcJf9HZAK4'
+        const raydium = await initSdk(masterWalletPrivKey)
+        const data = await raydium.api.fetchPoolById({ ids: poolId })
+
+        const poolInfo = data[0] as ApiV3PoolInfoStandardItemCpmm
+        const volume: number = poolInfo.day.volume
+        console.log("Current Volume:", volume);
+
+        if(!volume) return 0.1;
+
+        return volume as number;
+
+    } catch (error) {
+        console.log(error);
+        return null;
+    }
+}
+
+export const distributeTokensV3 = async (
     privateKey: string, 
-    isNaraToSol: boolean = true,
+    isNaraToSol: boolean = false,
     maxVolume: number,
+    amount: number,
     minWallets: number,
     maxWallets: number,
-    minLot: number,
-    maxLot: number,
-    minInterval: number,
-    maxInterval: number,
-    convertToLamports: boolean
 ): Promise<void> => {
-    //@ts-ignore
-    if(volume > 2) {
-        console.log("max volume reached");
-        return
-    };
-
-    let amount = Math.floor(Math.random() * (maxLot - minLot) + minLot);
-    const walletsCount = Math.floor(Math.random() * (maxWallets - minWallets) + minWallets);
-    const interval = Math.floor(Math.random() * (maxInterval - minInterval) + minInterval);
-
-    
     try {
-        await delay(interval * 1000);
-        
-        const swapResult = isNaraToSol 
-            ? await swapNARAtoSOL(amount.toString(), privateKey, convertToLamports) 
-            : await swapSOLtoNARA(amount.toString(), privateKey, convertToLamports);
-
-            console.log(swapResult, "swapResult")
-        if (!swapResult) throw new Error(`Failed to swap ${isNaraToSol ? 'NARA to SOL' : 'SOL to NARA'}`);
-        if (typeof swapResult === 'string') {
-            throw new Error(`Unexpected swap result: ${swapResult}`);
+        const currentVolume = await getCurrentVolume();
+        if (!currentVolume || currentVolume > maxVolume) {
+            console.log("Max volume reached");
+            return;
         }
-        const swappedAmount = parseFloat(swapResult.amount);
 
-
-        //@ts-ignore
-        volume = swapResult.volume.volume;
-
-        console.log(`Distributing ${swappedAmount} tokens...`);
-
-        const keepPercentage = Math.random() * 0.02 + 0.01; // 1-3%
-        const keepAmount = swappedAmount * keepPercentage;
-        const distributeAmount = swappedAmount - keepAmount;
-
-        const newWallets = await generateRandomWallets(walletsCount);
-
-        const distributionShares = Array.from({ length: walletsCount }, () => Math.random());
-
-        const totalShare = distributionShares.reduce((a, b) => a + b, 0);
-
-        console.log(`Distributing ${distributeAmount} tokens to ${walletsCount} wallets...`);
-        // console.log("Distribution shares:", distributionShares);
-
-        for (let i = 0; i < newWallets.length; i++) {
-            const wallet = newWallets[i];
-            const walletShare = distributionShares[i] / totalShare;
-            let walletAmount = Math.floor(distributeAmount * walletShare);
-
-            //calculate rent amount needed in new wallet
-            const rentAmount = await connection.getMinimumBalanceForRentExemption(165);
-
-            let finalAmount = walletAmount + rentAmount + 14830000;
-
-            await delay(10000);
-
-            if (isNaraToSol) {
-                //@ts-ignore
-                await transferSOL(privateKey, wallet.publicKey, finalAmount.toString());
-            } else {
-                 // Transfer SOL to new wallet for gas
-                 //@ts-ignore
-                await transferSOL(masterWalletPrivKey, wallet.publicKey, rentAmount + 34830000);
-
-                await transferNARA(
-                    "2u9ZQVaSTVxCBVoyw75QioxivBnhLkCsJzvFTR8oGjAH", 
-                    privateKey, 
-                    //@ts-ignore
-                    wallet.publicKey, 
-                    walletAmount
-                );
+        const walletQueue = [{ privateKey, isNaraToSol, amount }];
+        
+        while (walletQueue.length > 0) {
+            if (!currentVolume || currentVolume > maxVolume) {
+                console.log("Max volume reached");
+                return;
             }
-
-            // need to optimize more, recursive calling not good for many cycles
-            await distributeTokens(
+            const current = walletQueue.shift(); 
             //@ts-ignore
-                wallet.secretKey.base58, 
-                !isNaraToSol, 
-                maxVolume, 
-                minWallets, 
-                maxWallets,
-                walletAmount,
-                walletAmount,
-                minInterval,
-                maxInterval,
-                false
-                );
+            const { privateKey, isNaraToSol, amount } = current;
 
-            await delay(10000);
+            console.log(`Swapping ${amount} ${isNaraToSol ? 'NARA to SOL' : 'SOL to NARA'}`);
+            const swapResult = isNaraToSol 
+                ? await swapNARAtoSOL(amount.toString(), privateKey) 
+                : await swapSOLtoNARA(amount.toString(), privateKey);
+
+            if (!swapResult && walletQueue.length == 1) throw new Error(`Failed to swap ${isNaraToSol ? 'NARA to SOL' : 'SOL to NARA'}`);
+            if(!swapResult && walletQueue.length > 1) continue;
+
+            const swappedAmount = amount;
+
+            const keepPercentage = Math.random() * 0.02 + 0.01; // 1-3%
+            const keepAmount = swappedAmount * keepPercentage;
+
+            const distributeAmount = swappedAmount - keepAmount;
+
+            const walletsCount = Math.floor(Math.random() * (maxWallets - minWallets + 1)) + minWallets;
+            const newWallets = await generateRandomWallets(walletsCount);
+            
+            const distributionShares = Array.from({ length: walletsCount }, () => Math.random());
+            const totalShare = distributionShares.reduce((a, b) => a + b, 0);
+
+            for (let i = 0; i < newWallets.length; i++) {
+                const wallet = newWallets[i];
+                const rentAmount = await connection.getMinimumBalanceForRentExemption(165);
+
+                let walletShareSOL = 0;
+                let walletShareNARA = 0;
+                
+                // If isNaraToSol, SOL needs to be transferred to the new wallet; else NARA needs to be transferred
+                if (isNaraToSol) {
+                    walletShareSOL = Math.floor(distributeAmount * (distributionShares[i] / totalShare));
+                    const rentAndGas = walletShareSOL + rentAmount + 5175000; // Add rent and gas
+                    //also need to transfer rent and gas from master wallet
+                    console.log(`transferring ${rentAndGas} SOL`);
+                    const gasTransfer = await transferSOL(masterWalletPrivKey, wallet.publicKey, rentAndGas);
+                    if (!gasTransfer) continue;
+
+                    console.log(`transferring ${walletShareSOL} SOL`);
+                    const transfer = await transferSOL(privateKey, wallet.publicKey, walletShareSOL);
+                    if (!transfer) continue;
+                } else {
+                    walletShareNARA = Math.floor(distributeAmount * (distributionShares[i] / totalShare));
+                    // Also need to transfer some SOL to new wallet for rent + gas
+                    const rentAndGas = rentAmount + 5175000;
+                    console.log(`transferring ${rentAndGas} SOL`);
+                    const solTransfer = await transferSOL(masterWalletPrivKey, wallet.publicKey, rentAndGas);
+                    if (!solTransfer) continue;
+
+                    console.log(`transferring ${walletShareNARA} NARA`);
+                    const naraTransfer = await transferNARA(
+                        "2u9ZQVaSTVxCBVoyw75QioxivBnhLkCsJzvFTR8oGjAH", 
+                        privateKey, 
+                        wallet.publicKey, 
+                        walletShareNARA
+                    );
+                    if (!naraTransfer) continue;
+                }
+
+                walletQueue.push({
+                    privateKey: wallet.secretKey.base58,
+                    isNaraToSol: !isNaraToSol,
+                    amount: isNaraToSol ? walletShareSOL : walletShareNARA
+                });
+            }
         }
     } catch (error) {
-        console.error(`Distribution error:`, error);
+        console.log(error);
+        return;
     }
 }

@@ -16,7 +16,6 @@
                     <td class="p-2">Trade Mode</td>
                     <td class="p-2">
                         <select name="sell" id="sellSelect" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200">
-                            <option value="">Select</option>
                             <option value="true">Sell</option>
                             <option value="false">Buy</option>
                         </select>
@@ -26,7 +25,6 @@
                     <td class="p-2">On/Off</td>
                     <td class="p-2">
                         <select name="trigger" id="triggerSelect" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200">
-                            <option value="">Select</option>
                             <option value="true">On</option>
                             <option value="false">Off</option>
                         </select>
@@ -106,8 +104,8 @@
                 const config = response.data;
 
                 // Populate form fields
-                document.getElementById('sellSelect').value = config.sell !== undefined ? config.sell.toString() : '';
-                document.getElementById('triggerSelect').value = config.trigger !== undefined ? config.trigger.toString() : '';
+                document.getElementById('sellSelect').value = config.sell !== undefined ? config.sell.toString() : 'false';
+                document.getElementById('triggerSelect').value = config.trigger !== undefined ? config.trigger.toString() : 'false';
                 document.getElementById('diverseCheckbox').checked = config.diverse || false;
                 document.getElementById('minWalletsInput').value = config.minWallets || '';
                 document.getElementById('maxWalletsInput').value = config.maxWallets || '';
@@ -143,15 +141,17 @@
                         config[key] = value === 'true';
                         break;
                     case 'diverse':
-                        // Send false if unchecked
                         config[key] = value === 'on';
                         break;
                     default:
-                        // Convert numeric inputs to numbers
                         if (!isNaN(Number(value)) && value !== '') {
                             config[key] = Number(value);
                         }
                 }
+            }
+
+            if (!formData.has('diverse')) {
+                config['diverse'] = false;
             }
 
             const responseEl = document.getElementById('response');

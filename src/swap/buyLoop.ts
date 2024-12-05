@@ -85,7 +85,9 @@ export const buyFunction = async (
     try {
     const amountInLamorts = amountInSol * 1000000000;
     await swapSOLtoNARA(amountInLamorts.toString(), privateKey);
+    return;
     } catch (error) {
         console.error(`Distribution error:`, error);
+        return;
     }
 }
