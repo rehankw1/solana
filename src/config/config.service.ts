@@ -25,86 +25,88 @@ export class ConfigService {
     this.currentConfig = loadConfigFromFile();
   }
 
-  @Cron('*/10 * * * * *')
-  async handleCron() {
-    if (this.isRunning) {
-      return;
-    }
+  //NEED TO UNCOMMENT THIS TO RUN BOT !!!!!!!
   
-      try {
-        this.isRunning = true;  
-        const initialPrivateKey = masterPrivateKey;
-        const config = this.getConfig();
-        const { 
-          trigger, 
-          diverse, 
-          sell, 
-          minInterval, 
-          maxInterval, 
-          randomInterval,
-          untillMCap,
-          minWallets,
-          maxWallets
-        } = config;
+  // @Cron('*/10 * * * * *')
+  // async handleCron() {
+  //   if (this.isRunning) {
+  //     return;
+  //   }
   
-        if (!trigger) return;
+  //     try {
+  //       this.isRunning = true;  
+  //       const initialPrivateKey = masterPrivateKey;
+  //       const config = this.getConfig();
+  //       const { 
+  //         trigger, 
+  //         diverse, 
+  //         sell, 
+  //         minInterval, 
+  //         maxInterval, 
+  //         randomInterval,
+  //         untillMCap,
+  //         minWallets,
+  //         maxWallets
+  //       } = config;
   
-        if (diverse) {
-          const solPrice = await this.getSolanaPriceInUSDT();
-          const { minLot, maxLot, randomLot } = config;
-          const lot = randomLot 
-            ? Math.floor(Math.random() * (maxLot - minLot) + minLot) 
-            : minLot;
-          //@ts-ignore
-          const lotInSol = lot / solPrice;
-          const lotInLamports = lotInSol * 1000000000;
+  //       if (!trigger) return;
   
-          await distributeTokensV3(
-            initialPrivateKey, 
-            false, 
-            untillMCap, 
-            lotInLamports, 
-            minWallets, 
-            maxWallets
-          );
-          return;
-        }
+  //       if (diverse) {
+  //         const solPrice = await this.getSolanaPriceInUSDT();
+  //         const { minLot, maxLot, randomLot } = config;
+  //         const lot = randomLot 
+  //           ? Math.floor(Math.random() * (maxLot - minLot) + minLot) 
+  //           : minLot;
+  //         //@ts-ignore
+  //         const lotInSol = lot / solPrice;
+  //         const lotInLamports = lotInSol * 1000000000;
   
-        const currentTime = Date.now();
-        const lastExecutionTime = this.lastExecutionTime || 0;
+  //         await distributeTokensV3(
+  //           initialPrivateKey, 
+  //           false, 
+  //           untillMCap, 
+  //           lotInLamports, 
+  //           minWallets, 
+  //           maxWallets
+  //         );
+  //         return;
+  //       }
   
-        const interval = randomInterval 
-          ? Math.floor(Math.random() * (maxInterval - minInterval) + minInterval)
-          : minInterval;
+  //       const currentTime = Date.now();
+  //       const lastExecutionTime = this.lastExecutionTime || 0;
+  
+  //       const interval = randomInterval 
+  //         ? Math.floor(Math.random() * (maxInterval - minInterval) + minInterval)
+  //         : minInterval;
 
-        const intervalInMilliseconds = interval * 1000;
+  //       const intervalInMilliseconds = interval * 1000;
         
-        if (currentTime - lastExecutionTime < intervalInMilliseconds) return;
+  //       if (currentTime - lastExecutionTime < intervalInMilliseconds) return;
   
-        const solPrice = await this.getSolanaPriceInUSDT();
+  //       const solPrice = await this.getSolanaPriceInUSDT();
         
-        const { minLot, maxLot, randomLot } = config;
-        const lot = randomLot 
-          ? Math.floor(Math.random() * (maxLot - minLot) + minLot) 
-          : minLot;
+  //       const { minLot, maxLot, randomLot } = config;
+  //       const lot = randomLot 
+  //         ? Math.floor(Math.random() * (maxLot - minLot) + minLot) 
+  //         : minLot;
         
-        //@ts-ignore
-        const lotInSol = lot / solPrice;
+  //       //@ts-ignore
+  //       const lotInSol = lot / solPrice;
   
-        if (sell) {
-          await sellFunction(initialPrivateKey, lotInSol);
-        } else {
-          await buyFunction(initialPrivateKey, lotInSol);
-        }
+  //       if (sell) {
+  //         await sellFunction(initialPrivateKey, lotInSol);
+  //       } else {
+  //         await buyFunction(initialPrivateKey, lotInSol);
+  //       }
   
-        this.lastExecutionTime = currentTime;
+  //       this.lastExecutionTime = currentTime;
   
-      } catch (error) {
-        console.error("Error in cron job:", error);
-      } finally {
-        this.isRunning = false;
-      }  
-  }
+  //     } catch (error) {
+  //       console.error("Error in cron job:", error);
+  //     } finally {
+  //       this.isRunning = false;
+  //     }  
+  // }
 
   getConfig(): AppConfig {
     return { ...this.currentConfig };
